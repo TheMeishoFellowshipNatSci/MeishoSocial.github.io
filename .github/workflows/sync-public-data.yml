@@ -1,0 +1,27 @@
+name: Sync public timeline
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch public data
+        env:
+          GASSHO_EXPORT_URL: ${{ secrets.GASSHO_EXPORT_URL }}
+        run: |
+          test -n "$GASSHO_EXPORT_URL"
+          curl --fail --silent --show-error --location "$GASSHO_EXPORT_URL" -o data/public.json.tmp
+          python -m json.tool data/public.json.tmp >/dev/null
+          mv data/public.json.tmp data/public.json
+      - name: Commit when changed
+        run: |
+          git config user.name "meisho-social-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/public.json
+          git diff --cached --quiet || git commit -m "chore: sync public timeline"
+          git push
