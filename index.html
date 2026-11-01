@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ff8200">
+  <meta name="description" content="Meisho Social">
+  <title>Meisho Social</title>
+  <link rel="stylesheet" href="./assets/style.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+  <script src="./config.js"></script>
+  <script src="./assets/app.js" defer></script>
+</head>
+<body>
+  <div class="accent"></div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="icon-button mobile-menu" id="mobileMenu" aria-label="メニュー"><i data-lucide="menu"></i></button>
+      <button class="brand" data-view="general" aria-label="総合">
+        <span class="brand-mark">M</span>
+        <span><b><em>Meisho</em> Social</b><small>MEISHO SOCIAL NETWORK</small></span>
+      </button>
+      <label class="search"><i data-lucide="search"></i><input id="searchInput" autocomplete="off" placeholder="正行・同志・話題を検索"><kbd>Esc</kbd></label>
+      <div class="top-actions">
+        <button class="icon-button" id="themeToggle" aria-label="表示モード"><i data-lucide="moon"></i></button>
+        <button class="account-button" id="accountButton"><span class="avatar tiny"><span>M</span></span><span id="accountName">ログイン</span></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="left-nav" id="leftNav">
+      <nav>
+        <button class="nav-item active" data-view="general"><i data-lucide="home"></i><span>総合</span></button>
+        <button class="nav-item" data-view="humanities"><i data-lucide="globe-2"></i><span>人文社会学系統</span></button>
+        <button class="nav-item" data-view="science"><i data-lucide="flask-conical"></i><span>自然科学系統</span></button>
+        <button class="nav-item" data-view="topics"><i data-lucide="hash"></i><span>話題</span></button>
+        <button class="nav-item" data-view="profile"><i data-lucide="circle-user-round"></i><span>私</span></button>
+        <div class="divider"></div>
+        <button class="nav-item" id="themeNav"><i data-lucide="sun-moon"></i><span>表示モード</span></button>
+      </nav>
+      <button class="primary compose-button" id="composeButton"><i data-lucide="pen-line"></i><span>正行する</span></button>
+    </aside>
+
+    <main class="feed-column">
+      <section class="login-banner card" id="loginBanner">
+        <div><b>Meisho Socialへようこそ</b><small>元素会員番号で同志認証し、Meisho Socialへ接続します。</small></div>
+        <button class="primary login-trigger"><i data-lucide="log-in"></i> Googleでログイン</button>
+      </section>
+
+      <section id="timelinePanel">
+        <div class="timeline-head card">
+          <div><span class="eyebrow">TIMELINE</span><h1 id="timelineTitle">総合</h1></div>
+          <span class="live"><i></i>自動更新</span>
+        </div>
+        <section class="composer card" id="composer" hidden>
+          <div class="composer-head"><b>正行</b><span id="charCount">2000</span></div>
+          <textarea id="postText" maxlength="2000" placeholder="#話題# を付けて、同志へ正行する"></textarea>
+          <div class="composer-foot">
+            <label class="channel"><i data-lucide="radio-tower"></i><select id="postChannel"><option value="general">総合</option><option value="humanities">人文社会学系統</option><option value="science">自然科学系統</option></select></label>
+            <button class="primary" id="publishButton">安全審査へ</button>
+          </div>
+        </section>
+        <div class="topic-filter card" id="topicFilter" hidden><span></span><button class="secondary" id="clearTopic">すべて表示</button></div>
+        <div class="notice" id="notice" hidden></div>
+        <section class="post-list" id="postList"></section>
+      </section>
+
+      <section class="page card" id="topicsPanel" hidden><span class="eyebrow">TOPICS</span><h1>話題</h1><p>全ての正行から集計された話題です。選択すると同じ話題の正行を表示します。</p><div class="topic-grid" id="topicGrid"></div></section>
+      <section class="page card" id="profilePanel" hidden></section>
+    </main>
+
+    <aside class="right-column">
+      <section class="profile-card card" id="miniProfile">
+        <div class="cover"></div><span class="avatar profile-avatar"><span>M</span></span><b>ゲスト</b><small>ログインして参加</small>
+        <div class="stats"><span><b>–</b><small>同志</small></span><span><b>–</b><small>正行</small></span></div>
+      </section>
+      <section class="side-card card"><h2>Meisho 話題</h2><ol id="topicList"></ol></section>
+      <section class="side-card card"><h2>固定公式アカウント</h2><div id="officialList"></div></section>
+    </aside>
+  </div>
+
+  <div class="modal-backdrop" id="loginModal" hidden><section class="modal"><button class="close" data-close="loginModal"><i data-lucide="x"></i></button><div class="modal-brand"><span class="brand-mark large">M</span><h1><em>Meisho</em> Social</h1><p>Googleアカウントで安全に接続します</p></div><div id="googleButton" class="google-slot"></div><p class="muted" id="googleStatus">Googleのメールアドレスは公開されません。</p></section></div>
+
+  <div class="modal-backdrop" id="registerModal" hidden><form class="modal" id="registerForm"><div class="modal-brand"><span class="brand-mark large">M</span><h1>同志登録</h1><p>元素会員番号と公開プロフィールを設定します</p></div><label class="field">ペンネーム<input id="regName" maxlength="30" required></label><label class="field">Meisho ID<div class="input-prefix"><span>@</span><input id="regHandle" maxlength="24" placeholder="英小文字・数字・_" required></div></label><label class="field">元素会員番号<input id="regNumber" autocomplete="off" required></label><button class="primary full">利用を開始する</button><p class="muted">認証後、ユーザー名の横に王冠SVGと「同志」が表示されます。</p></form></div>
+
+  <div class="modal-backdrop" id="replyModal" hidden><form class="modal wide" id="replyForm"><button type="button" class="close" data-close="replyModal"><i data-lucide="x"></i></button><h2>正行へ返信</h2><div class="quoted-post" id="replyQuote"></div><textarea id="replyText" maxlength="2000" placeholder="返信を正行する" required></textarea><div class="modal-actions"><span id="replyCount">2000</span><button class="primary">返信する</button></div></form></div>
+
+  <div class="modal-backdrop" id="profileModal" hidden><form class="modal" id="profileForm"><button type="button" class="close" data-close="profileModal"><i data-lucide="x"></i></button><h2>プロフィール編集</h2><div class="avatar-preview"><img id="avatarPreview" alt=""></div><label class="file-button"><i data-lucide="image-plus"></i>画像を選択<input id="avatarInput" type="file" accept="image/png,image/jpeg,image/webp"></label><label class="field">ペンネーム<input id="editName" maxlength="30"></label><label class="field">自己紹介<textarea id="editBio" maxlength="160"></textarea></label><button class="primary full">保存</button></form></div>
+
+  <div class="modal-backdrop" id="frozenModal" hidden><section class="modal"><div class="modal-brand"><i class="danger-icon" data-lucide="shield-x"></i><h1>アカウントは凍結されています</h1><p>利用再開を希望する場合は、異議申し立てページをご利用ください。</p></div><a class="primary full center" id="appealLink" href="#">異議申し立てページ</a></section></div>
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+  <iframe id="bridge" title="Meisho Social API" hidden></iframe>
+</body></html>
