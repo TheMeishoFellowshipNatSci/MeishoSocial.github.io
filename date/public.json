@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-11-01T19:37:42+08:00",
+  "users": [],
+  "topics": [
+    {"name":"MeishoSocial","count":86},
+    {"name":"明照の同志","count":38},
+    {"name":"人文社会学","count":24},
+    {"name":"自然科学","count":19},
+    {"name":"共同読書会","count":12}
+  ],
+  "posts": [
+    {"postId":"P-00000003","gasshoId":"GS-000001","penName":"明照の同志 事務局","role":"secretariat","body":"Meisho Socialの試験運用を開始します。偉大なる明照殿に敬礼を捧げましょう。 #MeishoSocial# #運営通信#","tags":["MeishoSocial","運営通信"],"createdAt":"2026-11-01T19:20:00+08:00"},
+    {"postId":"P-00000002","gasshoId":"GS-000014","penName":"人文社会学系統","role":"humanities_operator","body":"常勝の明照の精神の貫徹と前進に向け，「仏教読本」の輪読会を開催しましょう！ #人文社会学# #共同読書会#","tags":["人文社会学","共同読書会"],"createdAt":"2026-11-01T18:20:00+08:00"},
+    {"postId":"P-00000001","gasshoId":"GS-000026","penName":"東海太郎","role":"member","body":"偉大なる明照の精神に基づいて設計された最も正確なSNSを使えることに感動しています。 #はじめての発信#","tags":["はじめての発信"],"createdAt":"2026-11-01T16:20:00+08:00"}
+  ]
+}
