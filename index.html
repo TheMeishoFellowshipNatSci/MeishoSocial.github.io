@@ -7,7 +7,6 @@
   <meta name="description" content="Meisho Social">
   <title>Meisho Social</title>
   <link rel="stylesheet" href="./assets/style.css">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
   <script src="./config.js"></script>
   <script src="./assets/app.js" defer></script>
@@ -81,9 +80,9 @@
     </aside>
   </div>
 
-  <div class="modal-backdrop" id="loginModal" hidden><section class="modal"><button class="close" data-close="loginModal"><i data-lucide="x"></i></button><div class="modal-brand"><span class="brand-mark large">M</span><h1><em>Meisho</em> Social</h1><p>Googleアカウントで安全に接続します</p></div><div id="googleButton" class="google-slot"></div><p class="muted" id="googleStatus">Googleのメールアドレスは公開されません。</p></section></div>
+  <div class="modal-backdrop" id="loginModal" hidden><section class="modal"><button class="close" data-close="loginModal"><i data-lucide="x"></i></button><div class="modal-brand"><span class="brand-mark large">M</span><h1><em>Meisho</em> Social</h1><p>Googleアカウントで安全に接続します</p></div><form id="loginForm"><label class="field">元素会員番号<input id="loginNumber" autocomplete="username" required></label><label class="field">認証PIN<input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" required></label><button class="primary full">迪温情報保護核心で接続</button></form><button type="button" class="secondary full register-trigger">初めて利用する方</button><p class="security-sign"><i data-lucide="shield-check"></i><b>迪温情報保護核心</b><span>元素会員番号 × PIN 認証</span></p></section></div>
 
-  <div class="modal-backdrop" id="registerModal" hidden><form class="modal" id="registerForm"><div class="modal-brand"><span class="brand-mark large">M</span><h1>同志登録</h1><p>元素会員番号と公開プロフィールを設定します</p></div><label class="field">ペンネーム<input id="regName" maxlength="30" required></label><label class="field">Meisho ID<div class="input-prefix"><span>@</span><input id="regHandle" maxlength="24" placeholder="英小文字・数字・_" required></div></label><label class="field">元素会員番号<input id="regNumber" autocomplete="off" required></label><button class="primary full">利用を開始する</button><p class="muted">認証後、ユーザー名の横に王冠SVGと「同志」が表示されます。</p></form></div>
+  <div class="modal-backdrop" id="registerModal" hidden><form class="modal" id="registerForm"><div class="modal-brand"><span class="brand-mark large">M</span><h1>同志登録</h1><p>元素会員番号と公開プロフィールを設定します</p></div><label class="field">ペンネーム<input id="regName" maxlength="30" required></label><label class="field">Meisho ID<div class="input-prefix"><span>@</span><input id="regHandle" maxlength="24" placeholder="英小文字・数字・_" required></div></label><label class="field">元素会員番号<input id="regNumber" autocomplete="off" required></label><label class="field">認証PIN<input id="regPin" type="password" inputmode="numeric" minlength="6" maxlength="32" required></label><label class="field">PINを再入力<input id="regPinConfirm" type="password" inputmode="numeric" minlength="6" maxlength="32" required></label><button class="primary full">迪温情報保護核心で登録</button><p class="muted">認証後、ユーザー名の横に王冠SVGと「同志」が表示されます。</p></form></div>
 
   <div class="modal-backdrop" id="replyModal" hidden><form class="modal wide" id="replyForm"><button type="button" class="close" data-close="replyModal"><i data-lucide="x"></i></button><h2>正行へ返信</h2><div class="quoted-post" id="replyQuote"></div><textarea id="replyText" maxlength="2000" placeholder="返信を正行する" required></textarea><div class="modal-actions"><span id="replyCount">2000</span><button class="primary">返信する</button></div></form></div>
 
