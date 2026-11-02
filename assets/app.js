@@ -1,0 +1,112 @@
+"use strict";
+const C=window.MEISHO_CONFIG,$=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const state={pending:new Map(),session:localStorage.getItem("meisho_session")||"",me:null,bootstrap:null,channel:"general",revision:0,posts:[],topics:[],topic:"",replyTo:"",avatarData:"",poll:null};
+const labels={general:"総合",humanities:"人文社会学系統",science:"自然科学系統"};
+
+function icons(){if(window.lucide)lucide.createIcons()}
+function esc(v){const d=document.createElement("div");d.textContent=String(v??"");return d.innerHTML}
+function norm(v){return String(v||"").normalize("NFKC").toLocaleLowerCase("ja-JP").replace(/\s+/g," ").trim()}
+
+function api(payload){
+  return new Promise((resolve,reject)=>{
+    const id=crypto.randomUUID();
+    const frame=document.createElement("iframe");
+    const form=document.createElement("form");
+    const payloadInput=document.createElement("input");
+    const idInput=document.createElement("input");
+    const frameName="meisho_api_"+id.replace(/-/g,"");
+
+    frame.name=frameName;
+    frame.hidden=true;
+    frame.setAttribute("aria-hidden","true");
+
+    form.method="POST";
+    form.action=C.GAS_BRIDGE_URL;
+    form.target=frameName;
+    form.hidden=true;
+
+    payloadInput.type="hidden";
+    payloadInput.name="payload";
+    payloadInput.value=JSON.stringify(payload);
+
+    idInput.type="hidden";
+    idInput.name="requestId";
+    idInput.value=id;
+
+    form.append(payloadInput,idInput);
+    document.body.append(frame,form);
+
+    const cleanup=()=>{
+      window.setTimeout(()=>{
+        form.remove();
+        frame.remove();
+      },0);
+    };
+
+    const timeout=window.setTimeout(()=>{
+      const pending=state.pending.get(id);
+      if(!pending)return;
+      state.pending.delete(id);
+      cleanup();
+      pending.reject(new Error("通信がタイムアウトしました。"));
+    },30000);
+
+    state.pending.set(id,{resolve,reject,timeout,cleanup});
+    form.submit();
+  });
+}
+
+addEventListener("message",event=>{
+  const message=event.data||{};
+  if(message.type!=="MEISHO_RESPONSE")return;
+
+  let trusted=false;
+  try{
+    const host=new URL(event.origin).hostname;
+    trusted=host==="script.googleusercontent.com"||host.endsWith(".script.googleusercontent.com")||host.endsWith(".googleusercontent.com");
+  }catch(error){
+    trusted=false;
+  }
+
+  if(!trusted)return;
+
+  const pending=state.pending.get(message.id);
+  if(!pending)return;
+
+  state.pending.delete(message.id);
+  clearTimeout(pending.timeout);
+  pending.cleanup();
+  pending.resolve(message.result||{});
+});
+
+function openModal(id){$("#"+id).hidden=false;icons()}
+function closeModal(id){$("#"+id).hidden=true}
+function handleLogin(r){if(r.error)return notice(r.error,false);if(r.frozen)return frozen(r.appealUrl);state.session=r.sessionToken;state.me=r.user;localStorage.setItem("meisho_session",state.session);closeModal("loginModal");closeModal("registerModal");start().catch(handleError)}
+async function call(action,extra={}){const r=await api({action,sessionToken:state.session,...extra});if(r.frozen||r.error==="ACCOUNT_FROZEN"){frozen(r.appealUrl);throw new Error("ACCOUNT_FROZEN")}if(r.error==="SESSION_EXPIRED"){localStorage.removeItem("meisho_session");state.session="";location.reload()}if(r.error)throw new Error(r.error);return r}
+async function start(){const b=await call("bootstrap");state.bootstrap=b;state.me=b.me;state.revision=b.revision;setAuthUI();renderMini();renderOfficial();await loadFeed();clearInterval(state.poll);state.poll=setInterval(checkRevision,Number(C.POLL_MS)||3000)}
+async function checkRevision(){try{const r=await call("revision");if(r.revision!==state.revision){state.revision=r.revision;await loadFeed();state.bootstrap=await call("bootstrap");renderMini();if(!$("#profilePanel").hidden)renderProfile()}}catch(e){}}
+async function loadFeed(){const r=await call("feed",{channel:state.channel,limit:150});state.posts=r.posts||[];state.topics=r.topics||[];state.revision=r.revision;renderFeed();renderTopics();renderTopicSide()}
+function setAuthUI(){const on=!!state.me;$("#loginBanner").hidden=on;$("#composer").hidden=!on;$("#accountName").textContent=on?state.me.penName:"ログイン";const a=$("#accountButton .avatar");a.innerHTML=on?avatarInner(state.me):"<span>M</span>";icons()}
+function avatarInner(u){return u&&u.avatarData?`<img src="${u.avatarData}" alt="">`:esc((u&&u.penName||"M")[0])}
+function memberBadge(){return '<span class="member-badge"><i data-lucide="crown"></i>同志</span>'}
+function postHtml(p){const official=!!p.official,body=esc(p.body||"").replace(/#([^#\n]{1,40})#/g,'<button type="button" class="tag" data-tag="$1">#$1#</button>');return `<article class="post ${official?'official':''}" data-id="${esc(p.postId)}"><div class="post-main"><span class="avatar-wrap"><span class="avatar ${official?'official':''}">${avatarInner(p)}</span>${official?'':'<span class="crown-dot"><i data-lucide="crown"></i></span>'}</span><div class="post-content"><div class="author ${official?'official-name':''}">${esc(p.penName)}${official?'':memberBadge()}</div><div class="meta">@${esc(p.handle)} · ${formatDate(p.createdAt)}</div>${p.replyTo?`<span class="reply-label">正行 ${esc(p.replyTo)} への返信</span>`:''}<div class="post-text">${body}</div></div></div><div class="post-actions"><button data-reply="${p.postId}"><i data-lucide="message-circle"></i><span>返信</span><b>${p.replyCount||0}</b></button><button data-share="${p.postId}"><i data-lucide="share-2"></i><span>共有</span></button><button data-praise="${p.postId}"><i data-lucide="heart"></i><span>礼賛</span><b>${p.praiseCount||0}</b></button></div></article>`}
+function renderFeed(){const words=norm($("#searchInput").value).split(" ").filter(Boolean);let posts=state.posts.filter(p=>!words.length||words.every(w=>norm([p.penName,p.handle,p.body,...(p.tags||[])].join(" ")).includes(w)));if(state.topic)posts=posts.filter(p=>(p.tags||[]).includes(state.topic));$("#postList").innerHTML=posts.length?posts.map(postHtml).join(""):'<div class="empty card">該当する正行はありません。</div>';$("#topicFilter").hidden=!state.topic;if(state.topic)$("#topicFilter span").innerHTML=`<b>#${esc(state.topic)}#</b> の正行を表示中（${posts.length}件）`;bindPosts();icons()}
+function bindPosts(){$$("[data-tag]").forEach(b=>b.onclick=()=>selectTopic(b.dataset.tag,true));$$('[data-reply]').forEach(b=>b.onclick=()=>{const p=state.posts.find(x=>x.postId===b.dataset.reply);state.replyTo=b.dataset.reply;$("#replyQuote").innerHTML=`<b>${esc(p?.penName||"")}</b><div>${esc(p?.body||"")}</div>`;$("#replyText").value="";$("#replyCount").textContent="2000";openModal("replyModal")});$$('[data-praise]').forEach(b=>b.onclick=async()=>{try{await call("praise",{postId:b.dataset.praise});await loadFeed()}catch(e){handleError(e)}});$$('[data-share]').forEach(b=>b.onclick=()=>sharePost(state.posts.find(x=>x.postId===b.dataset.share)))}
+function selectTopic(topic,insert){state.topic=topic;showView(state.channel,false);if(insert){const input=$("#postText"),token=`#${topic}#`;if(!input.value.includes(token)){input.value+=(input.value.trim()?" ":"")+token;input.dispatchEvent(new Event("input"))}}renderFeed();$("#postList").scrollIntoView({behavior:"smooth",block:"start"})}
+async function sharePost(p){if(!p)return;const url=location.origin+location.pathname+"?post="+encodeURIComponent(p.postId);try{if(navigator.share)await navigator.share({title:"Meisho Social",text:p.body.slice(0,100),url});else{await navigator.clipboard.writeText(url);notice("共有リンクをコピーしました。",true)}}catch(e){if(e.name!=="AbortError")handleError(e)}}
+function renderTopics(){$("#topicGrid").innerHTML=state.topics.map((t,i)=>`<button class="topic-card" data-topic-card="${esc(t.name)}"><b>${i+1}. #${esc(t.name)}#</b><small>${t.count}件</small></button>`).join("")||'<div class="empty">話題はまだありません。</div>';$$('[data-topic-card]').forEach(b=>b.onclick=()=>selectTopic(b.dataset.topicCard,false))}
+function renderTopicSide(){$("#topicList").innerHTML=state.topics.slice(0,10).map((t,i)=>`<li><b>${i+1}</b><button class="tag" data-side-topic="${esc(t.name)}">#${esc(t.name)}#</button><small>${t.count}</small></li>`).join("");$$('[data-side-topic]').forEach(b=>b.onclick=()=>selectTopic(b.dataset.sideTopic,false))}
+function renderMini(){const u=state.me,c=state.bootstrap?.counts||{};$("#miniProfile").innerHTML=`<div class="cover"></div><span class="avatar profile-avatar">${avatarInner(u)}</span><b>${esc(u.penName)} ${memberBadge()}</b><small>@${esc(u.handle)}</small><div class="stats"><span><b>${c.comrades||0}</b><small>同志</small></span><span><b>${c.posts||0}</b><small>正行</small></span></div>`;icons()}
+function renderOfficial(){const items=state.bootstrap?.official||[];$("#officialList").innerHTML=items.map(x=>`<div class="official-row"><span class="avatar official">${avatarInner(x.user)}</span><div><b>${esc(x.user.penName)}</b><small>@${esc(x.user.handle)} · 同志 ${x.counts.comrades||0}</small></div></div>`).join("")}
+function renderProfile(){const u=state.me,c=state.bootstrap.counts,following=new Set(state.bootstrap.follows||[]),people=(state.bootstrap.users||[]).filter(x=>x.userKey!==u.userKey);$("#profilePanel").innerHTML=`<span class="eyebrow">PROFILE</span><h1>私</h1><div class="profile-head"><span class="avatar">${avatarInner(u)}</span><div><h2>${esc(u.penName)} ${memberBadge()}</h2><p>@${esc(u.handle)} · ${esc(u.element||"")} · ${esc(u.academy||"")}</p><p>同志 ${c.comrades||0}　正行 ${c.posts||0}</p></div></div><div class="profile-actions"><button class="primary" id="editProfile"><i data-lucide="image-plus"></i>プロフィールを編集</button></div><h2>同志を探す</h2><div class="people-list">${people.map(x=>`<div class="person-row"><span class="avatar ${x.official?'official':''}">${avatarInner(x)}</span><div><b>${esc(x.penName)}${x.official?'':memberBadge()}</b><small>@${esc(x.handle)}</small></div><button class="${following.has(x.userKey)?'primary':'secondary'}" data-follow="${x.userKey}" ${x.official?'disabled title="固定同志"':''}>${following.has(x.userKey)?'同志':'同志になる'}</button></div>`).join("")}</div>`;$("#editProfile").onclick=()=>{$("#editName").value=u.penName;$("#editBio").value=u.bio||"";$("#avatarPreview").src=u.avatarData||"";state.avatarData="";openModal("profileModal")};$$('[data-follow]').forEach(b=>b.onclick=async()=>{try{await call("follow",{targetKey:b.dataset.follow});state.bootstrap=await call("bootstrap");renderMini();renderProfile()}catch(e){handleError(e)}});icons()}
+function showView(view,load=true){const timeline=["general","humanities","science"].includes(view);$("#timelinePanel").hidden=!timeline;$("#topicsPanel").hidden=view!=="topics";$("#profilePanel").hidden=view!=="profile";if(timeline){state.channel=view;$("#postChannel").value=view;$("#timelineTitle").textContent=labels[view];if(load&&state.me)loadFeed().catch(handleError)}if(view==="topics")renderTopics();if(view==="profile"&&state.me)renderProfile();$$('[data-view]').forEach(b=>b.classList.toggle("active",b.dataset.view===view));closeMobile();scrollTo({top:0,behavior:"smooth"})}
+function setTheme(theme,save=true){document.documentElement.classList.toggle("dark",theme==="dark");if(save)localStorage.setItem("meisho_theme",theme);$("#themeToggle").innerHTML=`<i data-lucide="${theme==='dark'?'sun':'moon'}"></i>`;icons()}
+function toggleTheme(){setTheme(document.documentElement.classList.contains("dark")?"light":"dark")}
+function openMobile(){$("#leftNav").classList.add("open");$("#mobileOverlay").classList.add("show")}
+function closeMobile(){$("#leftNav").classList.remove("open");$("#mobileOverlay").classList.remove("show")}
+function frozen(url){$("#appealLink").href=url||C.APPEAL_URL||"#";openModal("frozenModal")}
+function notice(message,ok=false){const n=$("#notice");n.textContent=message;n.hidden=false;n.style.background=ok?"#e9f8ef":"#fff0de";n.style.color=ok?"#167044":"#914800";setTimeout(()=>n.hidden=true,4500)}
+function handleError(e){if(e?.message!=="ACCOUNT_FROZEN")notice(e?.message||String(e),false)}
+function formatDate(v){try{return new Intl.DateTimeFormat("ja-JP",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(v))}catch{return String(v||"")}}
+async function resizeAvatar(file){if(!file)return"";if(file.size>5*1024*1024)throw new Error("5MB以下の画像を選択してください。");return new Promise((resolve,reject)=>{const reader=new FileReader(),img=new Image();reader.onerror=reject;img.onerror=reject;reader.onload=()=>img.src=reader.result;img.onload=()=>{const canvas=document.createElement("canvas");canvas.width=canvas.height=96;const ctx=canvas.getContext("2d"),side=Math.min(img.width,img.height);ctx.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,96,96);resolve(canvas.toDataURL("image/webp",.72))};reader.readAsDataURL(file)})}
+addEventListener("DOMContentLoaded",()=>{if(state.session)start().catch(handleError);$("#loginForm").onsubmit=async e=>{e.preventDefault();try{handleLogin(await api({action:"login",memberNumber:$("#loginNumber").value,pin:$("#loginPin").value}))}catch(err){handleError(err)}};$$('.register-trigger').forEach(b=>b.onclick=()=>{closeModal("loginModal");openModal("registerModal")});setTheme(localStorage.getItem("meisho_theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"),false);$$('.login-trigger').forEach(b=>b.onclick=()=>openModal("loginModal"));$$('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));$$('[data-view]').forEach(b=>b.onclick=()=>showView(b.dataset.view));$("#themeToggle").onclick=$("#themeNav").onclick=toggleTheme;$("#accountButton").onclick=()=>state.me?showView("profile"):openModal("loginModal");$("#composeButton").onclick=()=>{showView(state.channel);$("#postText").focus();$("#composer").scrollIntoView({behavior:"smooth"})};$("#mobileMenu").onclick=openMobile;$("#mobileOverlay").onclick=closeMobile;$("#searchInput").oninput=renderFeed;$("#searchInput").onkeydown=e=>{if(e.key==="Escape"){e.currentTarget.value="";state.topic="";renderFeed()}};$("#clearTopic").onclick=()=>{state.topic="";renderFeed()};$("#postText").oninput=e=>$("#charCount").textContent=2000-e.target.value.length;$("#replyText").oninput=e=>$("#replyCount").textContent=2000-e.target.value.length;$("#postChannel").onchange=e=>showView(e.target.value);$("#publishButton").onclick=async()=>{const body=$("#postText").value.trim();if(!body)return notice("正行内容を入力してください。");const b=$("#publishButton");b.disabled=true;try{await call("createPost",{body,channel:$("#postChannel").value,replyTo:""});$("#postText").value="";$("#charCount").textContent="2000";notice("正行を公開しました。",true);await loadFeed()}catch(e){handleError(e)}finally{b.disabled=false}};$("#registerForm").onsubmit=async e=>{e.preventDefault();try{handleLogin(await api({action:"register",penName:$("#regName").value,handle:$("#regHandle").value,memberNumber:$("#regNumber").value,pin:$("#regPin").value,pinConfirm:$("#regPinConfirm").value}))}catch(err){handleError(err)}};$("#replyForm").onsubmit=async e=>{e.preventDefault();try{await call("createPost",{body:$("#replyText").value,channel:state.channel,replyTo:state.replyTo});closeModal("replyModal");await loadFeed()}catch(err){handleError(err)}};$("#avatarInput").onchange=async e=>{try{state.avatarData=await resizeAvatar(e.target.files[0]);$("#avatarPreview").src=state.avatarData}catch(err){handleError(err)}};$("#profileForm").onsubmit=async e=>{e.preventDefault();try{state.me=await call("profile",{penName:$("#editName").value,bio:$("#editBio").value,avatarData:state.avatarData});closeModal("profileModal");state.bootstrap=await call("bootstrap");renderMini();renderProfile();await loadFeed()}catch(err){handleError(err)}};icons()})
